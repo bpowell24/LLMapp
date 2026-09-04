@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+venv/
+.vscode/
+
+# ⚠️ Volontairement PAS de ".env" ici : c'est exactement la vulnérabilité
+# qu'on veut tester (secret committé dans Git). Dans un vrai projet, la
+# ligne suivante devrait être présente :
+# .env

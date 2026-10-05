@@ -91,33 +91,43 @@ init_db()
 
 
 # ---------------------------------------------------------------------------
-# ÉTAPE 3/4 — SHA1.
+# ÉTAPE 4/4 — BCrypt. La bonne solution.
 #
-# SHA1 produit un hash plus long que MD5 (40 caractères hex contre 32) et
-# son algorithme interne est différent, mais pour le stockage de mots de
-# passe ça ne change RIEN à ce qui compte vraiment : toujours pas de salt,
-# et toujours beaucoup trop rapide à calculer (même ordre de grandeur que
-# MD5 en vitesse de calcul brute-force).
+# BCrypt corrige exactement les deux problèmes qui rendaient MD5 et SHA1
+# inadéquats pour des mots de passe :
 #
-# Autrement dit : MD5 -> SHA1 est une fausse bonne idée si l'intention est
-# de sécuriser des mots de passe. SHA1 est un excellent algorithme pour ce
-# pour quoi il a été conçu (vérifier l'intégrité de données, signatures),
-# mais "plus récent" ou "plus long" ne veut pas dire "conçu pour résister
-# à une attaque par force brute sur des mots de passe" — c'est justement
-# ce dernier point qui manque, et qui n'arrive qu'à l'étape suivante.
+#   1. Salt automatique et unique par mot de passe : bcrypt.gensalt()
+#      génère une valeur aléatoire différente à CHAQUE appel, et bcrypt la
+#      stocke directement DANS le hash qu'il retourne (pas besoin de gérer
+#      une colonne "salt" séparée — on l'a vu dans l'autre labo : un même
+#      mot de passe donne un hash complet différent pour chaque usager.
+#   2. Délibérément lent, et ajustable : le "cost factor" (12 par défaut
+#      dans la librairie bcrypt) contrôle le nombre de tours de calcul.
+#      Contrairement à MD5/SHA1 (conçus pour être RAPIDES), bcrypt est
+#      conçu pour être LENT — assez pour ne pas gêner une connexion
+#      normale (une fraction de seconde), mais assez pour rendre une
+#      attaque par force brute sur des millions de mots de passe
+#      beaucoup trop coûteuse en temps.
+#
+# Remarque pour le labo : la fonction fait 2 lignes. Tout l'effort "dur" du
+# salt et du cost factor est géré par la librairie — exactement le genre
+# de chose qu'il ne faut jamais réimplémenter soi-même.
 # ---------------------------------------------------------------------------
 
-import hashlib
+import bcrypt
 
 
 def hash_password(password: str) -> str:
-    """Hache le mot de passe en SHA1 (hexadécimal, 40 caractères)."""
-    return hashlib.sha1(password.encode("utf-8")).hexdigest()
+    """Hache le mot de passe en bcrypt (salt aléatoire inclus dans le résultat)."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, stored: str) -> bool:
-    """Re-hache le mot de passe fourni et compare au hash stocké."""
-    return hash_password(password) == stored
+    """Laisse bcrypt comparer : il relit le salt et le cost directement
+    depuis `stored` (le hash connaît son propre salt), donc on n'a jamais
+    besoin de le stocker ou de le manipuler nous-mêmes.
+    """
+    return bcrypt.checkpw(password.encode("utf-8"), stored.encode("utf-8"))
 
 
 # ---------------------------------------------------------------------------

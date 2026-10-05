@@ -91,26 +91,39 @@ init_db()
 
 
 # ---------------------------------------------------------------------------
-# ÉTAPE 1/4 — Mots de passe en texte clair.
+# ÉTAPE 2/4 — MD5.
 #
-# Le pire des cas : le mot de passe est stocké tel quel dans la base.
-# Quiconque obtient un accès en lecture à la base (fuite de backup, injection
-# SQL, employé malveillant, etc.) voit instantanément le mot de passe de
-# TOUS les usagers, en clair, prêt à être réutilisé ailleurs.
+# Mieux que le texte clair : une fuite de la base ne donne plus directement
+# le mot de passe. Mais MD5 reste un très mauvais choix pour des mots de
+# passe, pour deux raisons précises :
+#
+#   1. Pas de salt : deux usagers avec le même mot de passe ont EXACTEMENT
+#      le même hash dans la base — ça se voit à l'œil nu en comparant les
+#      colonnes, et ça permet les attaques par table arc-en-ciel
+#      (rainbow tables) précalculées une fois pour toutes.
+#   2. Beaucoup trop rapide à calculer : MD5 a été conçu pour vérifier
+#      l'intégrité de fichiers, pas pour résister à une attaque par force
+#      brute. Un GPU grand public calcule des milliards de MD5 par
+#      seconde — exactement ce qu'on a vu avec John/hashcat (mode -m 0)
+#      sur les mots de passe de l'autre labo.
 # ---------------------------------------------------------------------------
 
-def hash_password(password: str) -> str:
-    """Ne fait rien : retourne le mot de passe tel quel.
+import hashlib
 
-    Nommée "hash_password" même ici pour que son nom reste correct dans les
-    3 prochains commits sans avoir à changer les appels dans register().
-    """
-    return password
+
+def hash_password(password: str) -> str:
+    """Hache le mot de passe en MD5 (hexadécimal, 32 caractères)."""
+    return hashlib.md5(password.encode("utf-8")).hexdigest()
 
 
 def verify_password(password: str, stored: str) -> bool:
-    """Compare directement les deux chaînes."""
-    return password == stored
+    """Re-hache le mot de passe fourni et compare au hash stocké.
+
+    On ne peut jamais "déhacher" stored pour le comparer au mot de passe
+    en clair — on fait l'inverse : on hache le mot de passe candidat de
+    la même façon, et on compare les deux hash entre eux.
+    """
+    return hash_password(password) == stored
 
 
 # ---------------------------------------------------------------------------
